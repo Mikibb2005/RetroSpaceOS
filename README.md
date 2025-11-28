@@ -432,15 +432,9 @@ qemu-system-x86_64 -cdrom RetroSpaceOS.iso -serial stdio
 
 ## 📄 Licencia
 
-Este proyecto es de código abierto y está disponible para aprender. Siéntete libre de modificarlo y compartirlo.
-
+(por poner)
 ---
 
-## 🎓 Aprende Más
-
-**RetroSpaceOS** es un proyecto educativo. No esperes que compita con Linux o Windows, pero sí que te enseñe los fundamentos de cómo funcionan realmente los sistemas operativos.
-
-¡Buena suerte con tu kernel! 🚀
 
 ---
 
