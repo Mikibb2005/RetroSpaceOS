@@ -1,539 +1,773 @@
-/*
- * ============================================================================
- * RETROSPACEOS KERNEL - Núcleo del Sistema Operativo
- * ============================================================================
- * Este archivo contiene el código principal del kernel de RetroSpaceOS.
- * El kernel es el componente central del sistema operativo que gestiona:
- * - Memoria
- * - Procesos
- * - Dispositivos de E/S
- * - Sistema de archivos
- * ============================================================================
- */
+#include "chess.h"
+#include "fs.h"
+#include "io.h"
+#include "keyboard.h"
+#include "memory.h"
+#include "rtc.h"
+#include "spce.h"
+#include "string.h"
+#include "terminal.h"
+#include "types.h"
 
-// ============================================================================
-// DEFINICIONES Y CONSTANTES DEL SISTEMA
-// ============================================================================
-
-/*
- * Dirección de memoria del buffer de video VGA en modo texto.
- * 0xB8000 es la ubicación estándar en memoria donde se mapea la pantalla VGA.
- * Cada carácter ocupa 2 bytes:
- *   - Byte 0: El carácter ASCII a mostrar
- *   - Byte 1: Atributo de color (4 bits fondo + 4 bits texto)
- */
-#define VGA_MEMORY 0xB8000
-#define NULL ((void *)0)
-
-/*
- * Dimensiones de la pantalla en modo texto VGA (80 columnas x 25 filas).
- * Esto nos da un total de 2000 caracteres que podemos mostrar.
- */
 #define VGA_WIDTH 80
 #define VGA_HEIGHT 25
 
-/*
- * Enumeración de colores VGA disponibles en modo texto.
- * Estos valores se pueden combinar para crear el byte de atributo.
- */
-enum vga_color {
-  VGA_COLOR_BLACK = 0,
-  VGA_COLOR_BLUE = 1,
-  VGA_COLOR_GREEN = 2,
-  VGA_COLOR_CYAN = 3,
-  VGA_COLOR_RED = 4,
-  VGA_COLOR_MAGENTA = 5,
-  VGA_COLOR_BROWN = 6,
-  VGA_COLOR_LIGHT_GREY = 7,
-  VGA_COLOR_DARK_GREY = 8,
-  VGA_COLOR_LIGHT_BLUE = 9,
-  VGA_COLOR_LIGHT_GREEN = 10,
-  VGA_COLOR_LIGHT_CYAN = 11,
-  VGA_COLOR_LIGHT_RED = 12,
-  VGA_COLOR_LIGHT_MAGENTA = 13,
-  VGA_COLOR_LIGHT_BROWN = 14,
-  VGA_COLOR_WHITE = 15,
-};
-
 // ============================================================================
-// VARIABLES GLOBALES DEL KERNEL
+// ESTRUCTURAS Y VARIABLES GLOBALES
 // ============================================================================
-
-/*
- * TODO: Añadir aquí variables globales necesarias para:
- * - Posición actual del cursor (terminal_row, terminal_column)
- * - Color actual del texto (terminal_color)
- * - Puntero al buffer de video (terminal_buffer)
- */
-unsigned int terminal_row;       // posicion Y cursor
-unsigned int terminal_column;    // posicion X cursor
-unsigned int terminal_color;     // color del texto
-unsigned short *terminal_buffer; // puntero al buffer
-
-// ============================================================================
-// FUNCIONES AUXILIARES PARA MANEJO DE VIDEO VGA
-// ============================================================================
-
-/*
- * vga_entry_color: Crea un byte de atributo de color VGA
- *
- * @param fg: Color del texto (foreground)
- * @param bg: Color del fondo (background)
- * @return: Byte de color combinado (bg << 4 | fg)
- *
- * TODO: Implementar esta función para combinar colores de fondo y texto
- * Ejemplo: vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLUE) = 0x1F
- */
-static inline unsigned char vga_entry_color(enum vga_color fg,
-                                            enum vga_color bg) {
-  // TODO: Implementar combinación de colores (bg << 4 | fg)
-  if (bg << 4 | fg) {
-    return bg << 4 | fg;
-  }
-
-  return 0x0F; // Placeholder: blanco sobre negro
-}
-
-/*
- * vga_entry: Crea una entrada VGA completa (carácter + color)
- *
- * @param uc: Carácter a mostrar
- * @param color: Byte de color (creado con vga_entry_color)
- * @return: Palabra de 16 bits con el carácter y su atributo
- *
- * TODO: Implementar esta función para crear entradas VGA
- * Los 8 bits bajos son el carácter, los 8 bits altos son el color
- */
-static inline unsigned short vga_entry(unsigned char uc, unsigned char color) {
-  // TODO: Implementar (color << 8 | uc)
-  return color << 8 | uc;
-}
-
-/*
- * strlen: Calcula la longitud de una cadena
- *
- * @param str: Puntero a la cadena terminada en null
- * @return: Número de caracteres antes del '\0'
- *
- * TODO: Implementar esta función recorriendo la cadena hasta encontrar '\0'
- */
-unsigned int strlen(const char *str) {
-  // TODO: Implementar conteo de caracteres
-  unsigned int len = 0;
-  while (str[len]) {
-    len++;
-  }
-  return len;
-}
-
-// ============================================================================
-// FUNCIONES DE INICIALIZACIÓN DEL TERMINAL
-// ============================================================================
-
-/*
- * terminal_initialize: Inicializa el terminal VGA
- *
- * Esta función debe:
- * 1. Establecer la posición del cursor en (0,0)
- * 2. Configurar el color por defecto
- * 3. Obtener el puntero al buffer de video VGA
- * 4. Limpiar toda la pantalla (llenar con espacios)
- *
- * TODO: Implementar inicialización completa del terminal
- */
-void terminal_initialize(void) {
-  // TODO: Configurar variables globales del terminal
-  terminal_row = 0;
-  terminal_column = 0;
-  terminal_color = vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
-  terminal_buffer = (unsigned short *)VGA_MEMORY;
-
-  // Limpiar toda la pantalla (80x25 caracteres)
-  for (unsigned int y = 0; y < VGA_HEIGHT; y++) {
-    for (unsigned int x = 0; x < VGA_WIDTH; x++) {
-      const unsigned int index = y * VGA_WIDTH + x;
-      terminal_buffer[index] = vga_entry(' ', terminal_color);
-    }
-  }
-}
-
-/*
- * terminal_setcolor: Cambia el color actual del terminal
- *
- * @param color: Nuevo byte de color a usar
- *
- * TODO: Implementar esta función para cambiar terminal_color
- */
-void terminal_setcolor(unsigned char color) {
-  // TODO: Actualizar variable global de color
-  terminal_color = color;
-}
-
-/*
- * terminal_putentryat: Escribe un carácter con color en una posición específica
- *
- * @param c: Carácter a escribir
- * @param color: Color del carácter
- * @param x: Columna (0-79)
- * @param y: Fila (0-24)
- *
- * TODO: Implementar escritura directa en buffer VGA
- * Recordar: posición en buffer = y * VGA_WIDTH + x
- */
-void terminal_putentryat(char c, unsigned char color, unsigned int x,
-                         unsigned int y) {
-  // TODO: Calcular índice en el buffer
-  // TODO: Escribir la entrada VGA en esa posición
-  const unsigned int index = y * VGA_WIDTH + x;
-  unsigned short *terminal_buffer = (unsigned short *)VGA_MEMORY;
-  terminal_buffer[index] = vga_entry(c, color);
-}
-
-// ============================================================================
-// FUNCIONES DE ESCRITURA EN TERMINAL
-// ============================================================================
-
-/*
- * terminal_putchar: Escribe un carácter en la posición actual del cursor
- *
- * @param c: Carácter a escribir
- *
- * Esta función debe:
- * 1. Si el carácter es '\n', mover a la siguiente línea
- * 2. Escribir el carácter en la posición actual
- * 3. Avanzar la posición del cursor
- * 4. Si llegamos al final de la línea, pasar a la siguiente
- * 5. Si llegamos al final de la pantalla, hacer scroll
- *
- * TODO: Implementar lógica completa de escritura de caracteres
- */
-
-void terminal_scroll() {
-  unsigned short *buffer = (unsigned short *)VGA_MEMORY;
-
-  for (unsigned int y = 0; y < VGA_HEIGHT; y++)
-    for (unsigned int x = 0; x < VGA_WIDTH; x++)
-      buffer[y * VGA_WIDTH + x] = buffer[(y + 1) * VGA_WIDTH + x];
-
-  unsigned short blank = vga_entry(' ', terminal_color);
-  for (unsigned int x = 0; x < VGA_WIDTH; x++)
-    buffer[(VGA_HEIGHT - 1) * VGA_WIDTH + x] = blank;
-}
-
-void terminal_putchar(char c) {
-  // TODO: Manejar saltos de línea ('\n')
-  // TODO: Escribir carácter usando terminal_putentryat
-  // TODO: Actualizar posición del cursor (terminal_column++)
-  // TODO: Manejar fin de línea (pasar a siguiente fila)
-  // TODO: Implementar scroll si es necesario
-  if (c == '\n') {
-    terminal_row = terminal_row + 1;
-    terminal_column = 0;
-  } else {
-    terminal_putentryat(c, terminal_color, terminal_column, terminal_row);
-    terminal_column = terminal_column + 1;
-
-    if (terminal_column == VGA_WIDTH) {
-      terminal_row = terminal_row + 1;
-      terminal_column = 0;
-    }
-  }
-  if (terminal_row == VGA_HEIGHT) {
-    terminal_scroll();
-    terminal_row = VGA_HEIGHT - 1;
-  }
-}
-
-/*
- * terminal_write: Escribe una cadena de longitud específica
- *
- * @param data: Puntero a los datos a escribir
- * @param size: Número de caracteres a escribir
- *
- * TODO: Implementar bucle que llame a terminal_putchar para cada carácter
- */
-void terminal_write(const char *data, unsigned int size) {
-  // TODO: Iterar sobre los caracteres y llamar a terminal_putchar
-  for (unsigned int i = 0; i < size; i++) {
-    terminal_putchar(data[i]);
-  }
-}
-
-/*
- * terminal_writestring: Escribe una cadena terminada en null
- *
- * @param data: Puntero a la cadena a escribir
- *
- * TODO: Implementar usando strlen y terminal_write
- */
-void terminal_writestring(const char *data) {
-  // TODO: Calcular longitud con strlen
-  // TODO: Llamar a terminal_write con la longitud
-  terminal_write(data, strlen(data));
-}
-
-/*
- * terminal_clear: Limpia toda la pantalla
- *
- * TODO: Implementar limpieza de pantalla (llenar con espacios)
- * TODO: Resetear posición del cursor a (0,0)
- */
-void terminal_clear(void) {
-  // TODO: Llenar toda la pantalla con espacios en blanco
-  // TODO: Resetear terminal_row = 0, terminal_column = 0
-}
-
-// ============================================================================
-// FUNCIONES DE GESTIÓN DE INTERRUPCIONES
-// ============================================================================
-
-/*
- * IDT (Interrupt Descriptor Table): Tabla de descriptores de interrupciones
- * La IDT es una estructura que el procesador usa para saber qué código ejecutar
- * cuando ocurre una interrupción (hardware o software).
- *
- * TODO: Implementar estructura de la IDT
- * TODO: Crear funciones para instalar manejadores de interrupciones
- * TODO: Cargar la IDT usando la instrucción lidt
- */
 
 struct idt_entry {
-  unsigned short offset_low;
-  unsigned short selector;
-  unsigned char zero;
-  unsigned char flags;
-  unsigned short offset_high;
+  uint16_t base_lo;
+  uint16_t sel;
+  uint8_t always0;
+  uint8_t flags;
+  uint16_t base_hi;
+} __attribute__((packed));
+
+struct idt_ptr {
+  uint16_t limit;
+  uint32_t base;
+} __attribute__((packed));
+
+struct idt_entry idt[256];
+struct idt_ptr idtp;
+
+extern void isr0();
+extern void isr1();
+extern void isr2();
+extern void isr3();
+extern void isr4();
+extern void isr5();
+extern void isr6();
+extern void isr7();
+extern void isr8();
+extern void isr9();
+extern void isr10();
+extern void isr11();
+extern void isr12();
+extern void isr13();
+extern void isr14();
+extern void isr15();
+extern void isr16();
+extern void isr17();
+extern void isr18();
+extern void isr19();
+extern void isr20();
+extern void isr21();
+extern void isr22();
+extern void isr23();
+extern void isr24();
+extern void isr25();
+extern void isr26();
+extern void isr27();
+extern void isr28();
+extern void isr29();
+extern void isr30();
+extern void isr31();
+
+extern void irq0();
+extern void irq1();
+extern void irq2();
+extern void irq3();
+extern void irq4();
+extern void irq5();
+extern void irq6();
+extern void irq7();
+extern void irq8();
+extern void irq9();
+extern void irq10();
+extern void irq11();
+extern void irq12();
+extern void irq13();
+extern void irq14();
+extern void irq15();
+
+static void idt_set_gate(uint8_t num, uint32_t base, uint16_t sel,
+                         uint8_t flags) {
+  idt[num].base_lo = base & 0xFFFF;
+  idt[num].base_hi = (base >> 16) & 0xFFFF;
+  idt[num].sel = sel;
+  idt[num].always0 = 0;
+  idt[num].flags = flags;
+}
+
+// ============================================================================
+// PIC
+// ============================================================================
+
+static void pic_remap(void) {
+  outb(0x20, 0x11);
+  outb(0xA0, 0x11);
+  io_wait();
+  outb(0x21, 0x20);
+  io_wait();
+  outb(0xA1, 0x28);
+  io_wait();
+  outb(0x21, 0x04);
+  io_wait();
+  outb(0xA1, 0x02);
+  io_wait();
+  outb(0x21, 0x01);
+  io_wait();
+  outb(0xA1, 0x01);
+  io_wait();
+  outb(0x21, 0x0);
+  outb(0xA1, 0x0);
+}
+
+static void pic_send_eoi(uint8_t irq) {
+  if (irq >= 8)
+    outb(0xA0, 0x20);
+  outb(0x20, 0x20);
+}
+
+// ============================================================================
+// TIMER
+// ============================================================================
+
+static volatile uint32_t timer_ticks = 0;
+static uint32_t timer_freq = 100;
+
+static void timer_handler(void) { timer_ticks++; }
+
+static void timer_init(uint32_t freq) {
+  timer_freq = freq;
+  uint32_t divisor = 1193180 / freq;
+  outb(0x43, 0x36);
+  outb(0x40, divisor & 0xFF);
+  outb(0x40, (divisor >> 8) & 0xFF);
+}
+
+// ============================================================================
+// VARIABLES GLOBALES DE ESTADO
+// ============================================================================
+static bool show_interrupts = false;
+static volatile uint32_t irq_counter = 0;
+
+// ============================================================================
+// IRQ HANDLER
+// ============================================================================
+
+struct regs {
+  unsigned int gs, fs, es, ds;
+  unsigned int edi, esi, ebp, esp, ebx, edx, ecx, eax;
+  unsigned int int_no, err_code;
+  unsigned int eip, cs, eflags, useresp, ss;
 };
 
-// ============================================================================
-// FUNCIONES DE GESTIÓN DE MEMORIA
-// ============================================================================
+static const char *irq_names[] = {
+    "TIMER    ", "KEYBOARD ", "CASCADE  ", "COM2     ",
+    "COM1     ", "LPT2     ", "FLOPPY   ", "LPT1     ",
+    "RTC      ", "FREE     ", "FREE     ", "FREE     ",
+    "MOUSE    ", "FPU      ", "ATA1     ", "ATA2     "};
 
-/*
- * TODO: Implementar un gestor de memoria básico
- * Funciones necesarias:
- * - kmalloc: Asignar memoria en el kernel
- * - kfree: Liberar memoria
- * - memory_map: Obtener mapa de memoria del bootloader (Multiboot)
- *
- * El bootloader Multiboot proporciona un mapa de memoria que indica
- * qué regiones están disponibles para usar.
- */
+static void draw_system_monitor(uint32_t last_irq) {
+  // Guardar posición cursor
+  size_t old_row = terminal_row;
+  size_t old_col = terminal_column;
+  uint8_t old_color = terminal_color;
 
-// ============================================================================
-// FUNCIONES DE ENTRADA/SALIDA DE PUERTOS
-// ============================================================================
+  // Dibujar barra fondo azul
+  for (int i = 0; i < VGA_WIDTH; i++) {
+    terminal_putentryat(' ', vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLUE),
+                        i, 0);
+  }
 
-/*
- * outb: Escribe un byte en un puerto de E/S
- *
- * @param port: Número de puerto (0-65535)
- * @param value: Valor a escribir
- *
- * TODO: Implementar usando inline assembly
- * Instrucción: outb value, port
- */
-static inline void outb(unsigned short port, unsigned char value) {
-  // TODO: Implementar con __asm__ volatile
-  __asm__ volatile("outb %0, %1" : : "a"(value), "Nd"(port));
+  // Escribir info
+  terminal_row = 0;
+  terminal_column = 0;
+  terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLUE));
+
+  terminal_writestring(" [SYS MON] Ticks: ");
+  terminal_write_dec(irq_counter);
+
+  terminal_writestring(" | Last IRQ: ");
+  if (last_irq < 16) {
+    terminal_writestring(irq_names[last_irq]);
+  } else {
+    terminal_writestring("UNKNOWN  ");
+  }
+
+  terminal_writestring(" (");
+  terminal_write_dec(last_irq);
+  terminal_writestring(")");
+
+  // Restaurar
+  terminal_row = old_row;
+  terminal_column = old_col;
+  terminal_setcolor(old_color);
 }
 
-/*
- * inb: Lee un byte de un puerto de E/S
- *
- * @param port: Número de puerto a leer
- * @return: Byte leído del puerto
- *
- * TODO: Implementar usando inline assembly
- * Instrucción: inb port, %al
- */
-static inline unsigned char inb(unsigned short port) {
-  // TODO: Implementar con __asm__ volatile
-  unsigned char ret;
-  __asm__ volatile("inb %1, %0" : "=a"(ret) : "Nd"(port));
-  return ret;
+// Variable para recordar la última interrupción NO-Timer
+static uint32_t last_significant_irq = 0;
+
+void irq_handler(struct regs *r) {
+  irq_counter++;
+  uint32_t irq = r->int_no - 32;
+
+  if (irq != 0) {
+    last_significant_irq = irq;
+  }
+
+  if (show_interrupts) {
+    // Actualizar monitor (optimización: el timer solo actualiza cada 10 ticks
+    // para no parpadear tanto, o siempre) Para suavidad, actualizamos siempre
+    // pero solo la barra superior
+    draw_system_monitor(last_significant_irq);
+  }
+
+  if (irq == 0)
+    timer_handler();
+  else if (irq == 1)
+    keyboard_handler();
+
+  pic_send_eoi(irq);
+}
+
+void isr_handler(struct regs *r) {
+  (void)r;
+  // Fault handler stub
 }
 
 // ============================================================================
-// FUNCIONES DE CONTROL DEL TECLADO
+// INICIALIZACIÓN IDT
 // ============================================================================
 
-/*
- * TODO: Implementar driver básico del teclado
- * El teclado PS/2 usa los puertos 0x60 (datos) y 0x64 (comandos/estado)
- *
- * Funciones a implementar:
- * - keyboard_init: Inicializar el controlador del teclado
- * - keyboard_handler: Manejador de interrupción del teclado (IRQ 1)
- * - scancode_to_ascii: Convertir códigos de escaneo a ASCII
- */
+static void idt_init(void) {
+  idtp.limit = (sizeof(struct idt_entry) * 256) - 1;
+  idtp.base = (uint32_t)&idt;
+
+  kmemset(&idt, 0, sizeof(idt));
+
+  pic_remap();
+
+  // ISRs (0-31)
+  idt_set_gate(0, (uint32_t)isr0, 0x08, 0x8E);
+  idt_set_gate(1, (uint32_t)isr1, 0x08, 0x8E);
+  idt_set_gate(2, (uint32_t)isr2, 0x08, 0x8E);
+  idt_set_gate(3, (uint32_t)isr3, 0x08, 0x8E);
+  idt_set_gate(4, (uint32_t)isr4, 0x08, 0x8E);
+  idt_set_gate(5, (uint32_t)isr5, 0x08, 0x8E);
+  idt_set_gate(6, (uint32_t)isr6, 0x08, 0x8E);
+  idt_set_gate(7, (uint32_t)isr7, 0x08, 0x8E);
+  idt_set_gate(8, (uint32_t)isr8, 0x08, 0x8E);
+  idt_set_gate(9, (uint32_t)isr9, 0x08, 0x8E);
+  idt_set_gate(10, (uint32_t)isr10, 0x08, 0x8E);
+  idt_set_gate(11, (uint32_t)isr11, 0x08, 0x8E);
+  idt_set_gate(12, (uint32_t)isr12, 0x08, 0x8E);
+  idt_set_gate(13, (uint32_t)isr13, 0x08, 0x8E);
+  idt_set_gate(14, (uint32_t)isr14, 0x08, 0x8E);
+  idt_set_gate(15, (uint32_t)isr15, 0x08, 0x8E);
+  idt_set_gate(16, (uint32_t)isr16, 0x08, 0x8E);
+  idt_set_gate(17, (uint32_t)isr17, 0x08, 0x8E);
+  idt_set_gate(18, (uint32_t)isr18, 0x08, 0x8E);
+  idt_set_gate(19, (uint32_t)isr19, 0x08, 0x8E);
+  idt_set_gate(20, (uint32_t)isr20, 0x08, 0x8E);
+  idt_set_gate(21, (uint32_t)isr21, 0x08, 0x8E);
+  idt_set_gate(22, (uint32_t)isr22, 0x08, 0x8E);
+  idt_set_gate(23, (uint32_t)isr23, 0x08, 0x8E);
+  idt_set_gate(24, (uint32_t)isr24, 0x08, 0x8E);
+  idt_set_gate(25, (uint32_t)isr25, 0x08, 0x8E);
+  idt_set_gate(26, (uint32_t)isr26, 0x08, 0x8E);
+  idt_set_gate(27, (uint32_t)isr27, 0x08, 0x8E);
+  idt_set_gate(28, (uint32_t)isr28, 0x08, 0x8E);
+  idt_set_gate(29, (uint32_t)isr29, 0x08, 0x8E);
+  idt_set_gate(30, (uint32_t)isr30, 0x08, 0x8E);
+  idt_set_gate(31, (uint32_t)isr31, 0x08, 0x8E);
+
+  // IRQs (32-47)
+  idt_set_gate(32, (uint32_t)irq0, 0x08, 0x8E);
+  idt_set_gate(33, (uint32_t)irq1, 0x08, 0x8E);
+  idt_set_gate(34, (uint32_t)irq2, 0x08, 0x8E);
+  idt_set_gate(35, (uint32_t)irq3, 0x08, 0x8E);
+  idt_set_gate(36, (uint32_t)irq4, 0x08, 0x8E);
+  idt_set_gate(37, (uint32_t)irq5, 0x08, 0x8E);
+  idt_set_gate(38, (uint32_t)irq6, 0x08, 0x8E);
+  idt_set_gate(39, (uint32_t)irq7, 0x08, 0x8E);
+  idt_set_gate(40, (uint32_t)irq8, 0x08, 0x8E);
+  idt_set_gate(41, (uint32_t)irq9, 0x08, 0x8E);
+  idt_set_gate(42, (uint32_t)irq10, 0x08, 0x8E);
+  idt_set_gate(43, (uint32_t)irq11, 0x08, 0x8E);
+  idt_set_gate(44, (uint32_t)irq12, 0x08, 0x8E);
+  idt_set_gate(45, (uint32_t)irq13, 0x08, 0x8E);
+  idt_set_gate(46, (uint32_t)irq14, 0x08, 0x8E);
+  idt_set_gate(47, (uint32_t)irq15, 0x08, 0x8E);
+
+  __asm__ volatile("lidt (%0)" : : "r"(&idtp));
+}
 
 // ============================================================================
-// FUNCIONES DE CONTROL DEL TIMER
+// SHELL
 // ============================================================================
 
-/*
- * TODO: Implementar driver del temporizador (PIT - Programmable Interval Timer)
- * El PIT genera interrupciones a intervalos regulares (IRQ 0)
- *
- * Funciones a implementar:
- * - timer_init: Configurar la frecuencia del timer
- * - timer_handler: Manejador de interrupción del timer
- * - sleep: Función para pausar la ejecución por un tiempo determinado
- */
+#define CMD_SIZE 256
+static char cmd_buf[CMD_SIZE];
+static uint32_t cmd_pos = 0;
+
+static void cmd_help(void) {
+  terminal_setcolor(vga_entry_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK));
+  terminal_writestring("\n=== RetroSpaceOS v2.1 ===\n\n");
+  terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
+  terminal_writestring("Comandos:\n");
+  terminal_writestring("  help   - Muestra esta ayuda\n");
+  terminal_writestring("  clear  - Limpia la pantalla\n");
+  terminal_writestring("  time   - Muestra uptime\n");
+  terminal_writestring("  irq    - Toggle monitor de interrupciones\n");
+  terminal_writestring("  about  - Sobre RetroSpaceOS\n");
+  terminal_writestring("  ls     - Listar archivos (RAMFS)\n");
+  terminal_writestring("  spce   - SpaceEditor (spce [archivo])\n");
+  terminal_writestring("  reboot - Reinicia el sistema\n\n");
+}
+
+static void cmd_irq(void) {
+  show_interrupts = !show_interrupts;
+  if (show_interrupts) {
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
+    terminal_writestring("Monitor IRQ: ACTIVADO\n");
+  } else {
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK));
+    terminal_writestring("Monitor IRQ: DESACTIVADO\n");
+    // Limpiar área
+    for (int j = 65; j < VGA_WIDTH; j++) {
+      terminal_putentryat(
+          ' ', vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK), j, 0);
+    }
+  }
+  terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+}
+
+static void cmd_time(void) {
+  rtc_time_t t;
+  rtc_get_time(&t);
+
+  terminal_writestring("Fecha: ");
+  if (t.day < 10)
+    terminal_writestring("0");
+  terminal_write_dec(t.day);
+  terminal_writestring("/");
+  if (t.month < 10)
+    terminal_writestring("0");
+  terminal_write_dec(t.month);
+  terminal_writestring("/");
+  terminal_write_dec(2000 + t.year);
+  terminal_writestring("\n");
+
+  terminal_writestring("Hora:  ");
+  if (t.hour < 10)
+    terminal_writestring("0");
+  terminal_write_dec(t.hour);
+  terminal_writestring(":");
+  if (t.minute < 10)
+    terminal_writestring("0");
+  terminal_write_dec(t.minute);
+  terminal_writestring(":");
+  if (t.second < 10)
+    terminal_writestring("0");
+  terminal_write_dec(t.second);
+  terminal_writestring("\n");
+}
+
+static void cmd_about(void) {
+  terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
+  terminal_writestring("\n  RetroSpaceOS v2.1\n");
+  terminal_writestring("  - Kernel Modular\n");
+  terminal_writestring("  - Dynamic Heap Memory\n");
+  terminal_writestring("  - Advanced RAMFS\n");
+  terminal_writestring("  - SpaceEditor Pro\n");
+  terminal_writestring("  - IRQ Monitoring\n\n");
+  terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+}
+
+static void cmd_reboot(void) {
+  terminal_writestring("Reiniciando...\n");
+  outb(0x64, 0xFE);
+  for (;;)
+    __asm__ volatile("cli; hlt");
+}
 
 // ============================================================================
-// MAIN DEL KERNEL - PUNTO DE ENTRADA
+// HISTORIAL DE COMANDOS
+// ============================================================================
+#define HISTORY_SIZE 10
+static char history[HISTORY_SIZE][CMD_SIZE];
+static int history_count = 0;
+static int history_nav_idx = -1;
+
+static void history_add(const char *cmd) {
+  if (cmd[0] == 0)
+    return;
+  // Evitar duplicados consecutivos
+  if (history_count > 0) {
+    int last_idx = (history_count - 1) % HISTORY_SIZE;
+    if (kstrcmp(history[last_idx], cmd) == 0)
+      return;
+  }
+  kstrcpy(history[history_count % HISTORY_SIZE], cmd);
+  history_count++;
+}
+
+// ============================================================================
+// COMANDOS DE ARCHIVOS
 // ============================================================================
 
-/*
- * kernel_main: Punto de entrada principal del kernel
- *
- * Esta función es llamada desde el bootloader (boot.asm) después de que
- * el sistema ha arrancado y está en modo protegido de 32 bits.
- *
- * El bootloader ya ha configurado:
- * - Stack funcional
- * - Modo protegido de 32 bits
- * - Información Multiboot en los registros EBX y EAX
- *
- * Aquí debes:
- * 1. Inicializar el terminal VGA
- * 2. Mostrar un mensaje de bienvenida
- * 3. Inicializar subsistemas (IDT, interrupciones, etc.)
- * 4. Entrar en un bucle infinito o iniciar el shell
- */
+static void cmd_cat(const char *arg) {
+  if (!arg) {
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK));
+    terminal_writestring("Uso: cat <archivo>\n");
+    terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+    return;
+  }
+  fs_node_t *f = fs_open(arg);
+  if (!f) {
+    terminal_writestring("Archivo no encontrado.\n");
+    return;
+  }
+  if (f->type == FS_DIR) {
+    terminal_writestring("Es un directorio.\n");
+    return;
+  }
+  terminal_writestring(f->content);
+  terminal_writestring("\n");
+}
+
+static void cmd_rm(const char *arg) {
+  if (!arg) {
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK));
+    terminal_writestring("Uso: rm <archivo>\n");
+    terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+    return;
+  }
+  fs_delete(arg);
+  terminal_writestring("Eliminado (si existia).\n");
+}
+
+static void cmd_touch(const char *arg) {
+  if (!arg) {
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK));
+    terminal_writestring("Uso: touch <archivo>\n");
+    terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+    return;
+  }
+  if (fs_create_file(arg)) {
+    terminal_writestring("Archivo creado.\n");
+  } else {
+    terminal_writestring("Error: No se pudo crear (¿ya existe?)\n");
+  }
+}
+
+static void cmd_mkdir(const char *arg) {
+  if (!arg) {
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK));
+    terminal_writestring("Uso: mkdir <nombre>\n");
+    terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+    return;
+  }
+  if (fs_create_dir(arg)) {
+    terminal_writestring("Directorio creado.\n");
+  } else {
+    terminal_writestring("Error: No se pudo crear (¿ya existe?)\n");
+  }
+}
+
+static void cmd_cd(const char *arg) {
+  if (!arg) {
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK));
+    terminal_writestring("Uso: cd <ruta>\n");
+    terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+    return;
+  }
+  fs_cd(arg);
+}
+
+static void cmd_pwd(void) {
+  fs_pwd();
+  terminal_writestring("\n");
+}
+
+static void cmd_chess(void) {
+  chess_start();
+  terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+  terminal_clear();
+  terminal_writestring("Gracias por jugar a RetroSpace Chess.\n");
+}
+
+static void process_cmd(void) {
+  cmd_buf[cmd_pos] = '\0';
+  if (cmd_pos == 0)
+    return;
+
+  // Guardar en historial
+  history_add(cmd_buf);
+  history_nav_idx = -1; // Reset navegación
+
+  char *cmd = cmd_buf;
+  char *arg = NULL;
+
+  int i = 0;
+  while (cmd_buf[i]) {
+    if (cmd_buf[i] == ' ') {
+      cmd_buf[i] = '\0';
+      arg = &cmd_buf[i + 1];
+      break;
+    }
+    i++;
+  }
+
+  if (kstrcmp(cmd, "help") == 0)
+    cmd_help();
+  else if (kstrcmp(cmd, "clear") == 0)
+    terminal_clear();
+  else if (kstrcmp(cmd, "time") == 0)
+    cmd_time();
+  else if (kstrcmp(cmd, "irq") == 0)
+    cmd_irq();
+  else if (kstrcmp(cmd, "about") == 0)
+    cmd_about();
+  else if (kstrcmp(cmd, "ls") == 0)
+    fs_list();
+  else if (kstrcmp(cmd, "cat") == 0)
+    cmd_cat(arg);
+  else if (kstrcmp(cmd, "rm") == 0)
+    cmd_rm(arg);
+  else if (kstrcmp(cmd, "touch") == 0)
+    cmd_touch(arg);
+  else if (kstrcmp(cmd, "mkdir") == 0)
+    cmd_mkdir(arg);
+  else if (kstrcmp(cmd, "cd") == 0)
+    cmd_cd(arg);
+  else if (kstrcmp(cmd, "pwd") == 0)
+    cmd_pwd();
+  else if (kstrcmp(cmd, "reboot") == 0)
+    cmd_reboot();
+  else if (kstrcmp(cmd, "spce") == 0)
+    cmd_spce(arg);
+  else if (kstrcmp(cmd, "chess") == 0)
+    cmd_chess();
+  else {
+    terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK));
+    terminal_writestring("Comando no encontrado: ");
+    terminal_writestring(cmd);
+    terminal_writestring("\n");
+    terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+  }
+}
+
+static void shell_prompt(void) {
+  char cwd[128];
+  fs_get_cwd(cwd, 128);
+
+  terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
+  terminal_writestring("user@retrospace");
+  terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+  terminal_writestring(":");
+  terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_BLUE, VGA_COLOR_BLACK));
+  terminal_writestring(cwd);
+  terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+  terminal_writestring("> ");
+}
+
+// Auxiliar para autocompletado
+static void autocomplete(char *buf, uint32_t *pos) {
+  // 1. Encontrar inicio de la palabra actual (último espacio)
+  int start = *pos;
+  while (start > 0 && buf[start - 1] != ' ') {
+    start--;
+  }
+
+  // Si no hay nada que completar
+  if (start == *pos)
+    return;
+
+  char partial[32];
+  int len = *pos - start;
+  if (len >= 31)
+    return;
+
+  for (int i = 0; i < len; i++)
+    partial[i] = buf[start + i];
+  partial[len] = '\0';
+
+  // 2. Buscar coincidencias en directorio actual
+  fs_node_t *dir = fs_get_current_dir();
+  if (!dir || dir->type != FS_DIR)
+    return;
+
+  fs_node_t *curr = dir->child;
+  fs_node_t *match = NULL;
+  int matches = 0;
+
+  while (curr) {
+    // Check prefix
+    bool is_prefix = true;
+    for (int i = 0; i < len; i++) {
+      if (curr->name[i] != partial[i]) {
+        is_prefix = false;
+        break;
+      }
+    }
+
+    if (is_prefix) {
+      match = curr;
+      matches++;
+    }
+    curr = curr->next;
+  }
+
+  // 3. Completar si es único
+  if (matches == 1 && match) {
+    // Escribir el resto del nombre
+    const char *rest = match->name + len;
+    while (*rest &&
+           *pos < CMD_SIZE - 2) { // Dejar espacio para posible / o espacio
+      buf[(*pos)++] = *rest;
+      terminal_putchar(*rest);
+      rest++;
+    }
+    // Si es directorio, añadir /
+    if (match->type == FS_DIR) {
+      buf[(*pos)++] = '/';
+      terminal_putchar('/');
+    } else {
+      buf[(*pos)++] = ' ';
+      terminal_putchar(' ');
+    }
+  } else if (matches > 1) {
+    // Beep o listar opciones (simplificado: beep visual)
+    // terminal_writestring("\a");
+  }
+}
+
+static void shell_run(void) {
+  terminal_writestring("\n");
+  shell_prompt();
+
+  while (1) {
+    unsigned char c = kb_getchar();
+
+    if (c == '\n') {
+      terminal_putchar('\n');
+      process_cmd();
+      cmd_pos = 0;
+      shell_prompt();
+    } else if (c == '\t') { // TAB Autocomplete
+      autocomplete(cmd_buf, &cmd_pos);
+    } else if (c == '\b') {
+      if (cmd_pos > 0) {
+        cmd_pos--;
+        terminal_putchar('\b');
+      }
+    } else if (c == KEY_UP) {
+      if (history_count > 0) {
+        // Calcular nuevo índice
+        if (history_nav_idx == -1)
+          history_nav_idx = history_count - 1;
+        else if (history_nav_idx > 0 &&
+                 history_nav_idx > history_count - HISTORY_SIZE)
+          history_nav_idx--;
+
+        // Borrar línea actual
+        // Necesitamos saber longitud del prompt para borrar correctamente,
+        // pero terminal_putchar('\b') solo mueve cursor.
+        // Simplificación: Borrar visualmente todo lo escrito
+        // (Asumimos que el usuario no ha hecho wrap de línea)
+        while (cmd_pos > 0) {
+          terminal_putchar('\b');
+          cmd_pos--;
+        }
+
+        // Copiar del historial
+        const char *hist_cmd = history[history_nav_idx % HISTORY_SIZE];
+        kstrcpy(cmd_buf, hist_cmd);
+        cmd_pos = kstrlen(cmd_buf);
+        terminal_writestring(cmd_buf);
+      }
+    } else if (c == KEY_DOWN) {
+      if (history_count > 0 && history_nav_idx != -1) {
+        history_nav_idx++;
+
+        // Borrar línea
+        while (cmd_pos > 0) {
+          terminal_putchar('\b');
+          cmd_pos--;
+        }
+
+        if (history_nav_idx >= history_count) {
+          history_nav_idx = -1; // Volver a línea vacía
+        } else {
+          const char *hist_cmd = history[history_nav_idx % HISTORY_SIZE];
+          kstrcpy(cmd_buf, hist_cmd);
+          cmd_pos = kstrlen(cmd_buf);
+          terminal_writestring(cmd_buf);
+        }
+      }
+    } else if (c >= 32 && c < 127 && cmd_pos < CMD_SIZE - 1) {
+      cmd_buf[cmd_pos++] = c;
+      terminal_putchar(c);
+    }
+  }
+}
+
+// ============================================================================
+// KERNEL MAIN
+// ============================================================================
+
 void kernel_main(void) {
-  // Inicialización básica del terminal
-  unsigned short *video = (unsigned short *)VGA_MEMORY;
-
-  // Mostrar mensaje de bienvenida
-  const char *welcome = "RetroSpaceOS v0.1 - Kernel Loaded!";
-  unsigned char color = 0x4F; // Blanco sobre rojo
-
-  // Escribir mensaje carácter por carácter
-  for (int i = 0; welcome[i] != '\0'; i++) {
-    video[i] = (unsigned short)welcome[i] | ((unsigned short)color << 8);
-  }
-
-  /*
-   * TODO: Descomentar y completar cuando implementes las funciones
-   *
-   * terminal_initialize();
-   * terminal_writestring("===========================================\n");
-   * terminal_writestring("  BIENVENIDO A RETROSPACEOS\n");
-   * terminal_writestring("  Sistema Operativo en Desarrollo\n");
-   * terminal_writestring("===========================================\n\n");
-   *
-   * terminal_writestring("Inicializando subsistemas...\n");
-   *
-   * // TODO: Inicializar IDT
-   * // idt_init();
-   * // terminal_writestring("[OK] IDT inicializada\n");
-   *
-   * // TODO: Habilitar interrupciones
-   * // __asm__ volatile ("sti");
-   * // terminal_writestring("[OK] Interrupciones habilitadas\n");
-   *
-   * // TODO: Inicializar timer
-   * // timer_init();
-   * // terminal_writestring("[OK] Timer inicializado\n");
-   *
-   * // TODO: Inicializar teclado
-   * // keyboard_init();
-   * // terminal_writestring("[OK] Teclado inicializado\n");
-   *
-   * terminal_writestring("\nSistema listo. Escribe algo!\n> ");
-   */
-
-  // Bucle infinito - El kernel nunca debe terminar
-
   terminal_initialize();
-  terminal_writestring("===========================================\n");
-  terminal_writestring("  BIENVENIDO A RETROSPACEOS\n");
-  terminal_writestring("  Sistema Operativo en Desarrollo\n");
-  terminal_writestring("===========================================\n\n");
 
-  terminal_writestring("Inicializando subsistemas...\n");
+  terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
+  terminal_writestring("\n\n");
+  terminal_writestring(
+      "  ____      _             ____                       \n");
+  terminal_writestring(
+      " |  _ \\ ___| |_ _ __ ___ / ___| _ __   __ _  ___ ___ \n");
+  terminal_writestring(
+      " | |_) / _ \\ __| '__/ _ \\\\___ \\| '_ \\ / _` |/ __/ _ \\\n");
+  terminal_writestring(
+      " |  _ <  __/ |_| | | (_) |___) | |_) | (_| | (_|  __/\n");
+  terminal_writestring(
+      " |_| \\_\\___|\\__|_|  \\___/|____/| .__/ \\__,_|\\___\\___|\n");
+  terminal_writestring(
+      "                               |_|        OS v2.0   \n");
+  terminal_writestring("\n");
 
+  terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+  terminal_writestring(
+      "==========================================================\n\n");
+
+  terminal_writestring("  [");
+  terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
+  terminal_writestring("OK");
+  terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
+  terminal_writestring("] Memory Manager (Heap)\n");
+  kheap_init();
+
+  terminal_writestring("  [");
+  terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
+  terminal_writestring("OK");
+  terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
+  terminal_writestring("] File System (RAMFS)\n");
+  fs_init();
+
+  terminal_writestring("  [");
+  terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
+  terminal_writestring("OK");
+  terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
+  terminal_writestring("] Interrupts & Timer\n");
   idt_init();
-  terminal_writestring("[OK] IDT inicializada\n");
+  timer_init(100);
+  keyboard_init(); // Inicializar teclado explícitamente
+  terminal_writestring("  [");
+  terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
+  terminal_writestring("OK");
+  terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
+  terminal_writestring("] Keyboard Initialized\n");
 
-  for (;;) {
-    /*
-     * Instrucción HLT (Halt): Detiene el procesador hasta la próxima
-     * interrupción Esto ahorra energía y evita que el CPU esté ocupado al 100%
-     *
-     * TODO: Cuando implementes interrupciones, aquí podrías procesar eventos
-     * del teclado, timer, etc.
-     */
-    __asm__ volatile("hlt");
-  }
+  // Force unmask IRQ 0 (Timer) and IRQ 1 (Keyboard) explicitly
+  // 0xFC = 1111 1100 (Bit 0=0 enable Timer, Bit 1=0 enable Keyboard)
+  outb(0x21, 0xFC);
+  outb(0xA1, 0xFF);
+
+  __asm__ volatile("sti");
+
+  shell_run();
 }
-
-/*
- * ============================================================================
- * GUÍA DE DESARROLLO DEL KERNEL
- * ============================================================================
- *
- * FASE 1 - FUNDAMENTOS (LO BÁSICO):
- * --------------------------------
- * 1. Completar las funciones de terminal (terminal_initialize,
- * terminal_putchar, etc.)
- * 2. Implementar terminal_scroll para hacer scroll cuando la pantalla está
- * llena
- * 3. Probar escribiendo mensajes en diferentes colores
- *
- * FASE 2 - INTERRUPCIONES:
- * -----------------------
- * 1. Crear estructura de la IDT (256 entradas)
- * 2. Implementar idt_set_gate para instalar manejadores
- * 3. Implementar idt_init para cargar la IDT
- * 4. Programar el PIC (Programmable Interrupt Controller) para remapear IRQs
- * 5. Crear manejadores básicos de excepciones (división por cero, page fault,
- * etc.)
- *
- * FASE 3 - TIMER Y TECLADO:
- * ------------------------
- * 1. Implementar driver del PIT para generar interrupciones de tiempo
- * 2. Crear un contador de ticks y funciones de tiempo
- * 3. Implementar driver del teclado PS/2
- * 4. Crear tabla de conversión de scancodes a ASCII
- * 5. Implementar buffer circular para entrada de teclado
- *
- * FASE 4 - GESTIÓN DE MEMORIA:
- * ---------------------------
- * 1. Leer el mapa de memoria del Multiboot
- * 2. Implementar allocador de memoria física (bitmap o buddy system)
- * 3. Implementar paginación (crear tablas de páginas)
- * 4. Implementar kmalloc/kfree para kernel heap
- *
- * FASE 5 - PROCESOS Y MULTITAREA:
- * ------------------------------
- * 1. Crear estructura de PCB (Process Control Block)
- * 2. Implementar cambio de contexto
- * 3. Crear scheduler básico (round-robin)
- * 4. Implementar syscalls básicas
- *
- * FASE 6 - SISTEMA DE ARCHIVOS:
- * ----------------------------
- * 1. Implementar driver de disco (ATA/IDE)
- * 2. Crear sistema de archivos simple (FAT16 o propio)
- * 3. Implementar funciones de archivo (open, read, write, close)
- *
- * FASE 7 - SHELL Y COMANDOS:
- * -------------------------
- * 1. Crear un shell básico
- * 2. Implementar comandos básicos (ls, cat, echo, clear, etc.)
- * 3. Agregar soporte para ejecutar programas
- *
- * ============================================================================
- * RECURSOS ÚTILES:
- * ============================================================================
- * - OSDev Wiki: https://wiki.osdev.org/
- * - Intel Software Developer Manuals:
- * https://software.intel.com/content/www/us/en/develop/articles/intel-sdm.html
- * - James Molloy's Kernel Tutorial: http://www.jamesmolloy.co.uk/tutorial_html/
- * - Writing a Simple Operating System from Scratch by Nick Blundell
- * ============================================================================
- */
