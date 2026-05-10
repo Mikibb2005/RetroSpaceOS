@@ -32,6 +32,8 @@ struct idt_ptr {
 struct idt_entry idt[256];
 struct idt_ptr idtp;
 
+
+//32 bits de isr (instruction set register)
 extern void isr0();
 extern void isr1();
 extern void isr2();
@@ -65,6 +67,8 @@ extern void isr29();
 extern void isr30();
 extern void isr31();
 
+
+//16 irq (interrupt request)
 extern void irq0();
 extern void irq1();
 extern void irq2();
@@ -149,10 +153,10 @@ static volatile uint32_t irq_counter = 0;
 // ============================================================================
 
 struct regs {
-  unsigned int gs, fs, es, ds;
-  unsigned int edi, esi, ebp, esp, ebx, edx, ecx, eax;
-  unsigned int int_no, err_code;
-  unsigned int eip, cs, eflags, useresp, ss;
+  unsigned int gs, fs, es, ds;                         // registros de 
+  unsigned int edi, esi, ebp, esp, ebx, edx, ecx, eax; // registros de 
+  unsigned int int_no, err_code;                       // registros de 
+  unsigned int eip, cs, eflags, useresp, ss;           // registros de 
 };
 
 static const char *irq_names[] = {
