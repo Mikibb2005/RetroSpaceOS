@@ -102,8 +102,8 @@ static const char *get_piece_name(int p) {
 // LÓGICA DE MOVIMIENTO
 // ============================================================================
 
-static bool is_valid_move_basic(int x1, int y1, int x2, int y2, int piece,
-                                bool capture) {
+static bool is_valid_move_basic(int x1, int y1, int x2, int y2, int piece, bool capture) 
+{
   int dx = x2 - x1;
   int dy = y2 - y1;
   int adx = abs(dx);
@@ -566,7 +566,7 @@ void chess_start(void) {
             char coord[3] = {'A' + cursor_x, '8' - cursor_y, 0};
             kstrcpy(msg_buf, get_piece_name(p));
             // Concatenación manual simple
-            const char *name = get_piece_name(p);
+            //const char *name = get_piece_name(p);
             int len = kstrlen(msg_buf);
             msg_buf[len++] = ' ';
             msg_buf[len++] = coord[0];

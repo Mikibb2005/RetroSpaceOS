@@ -15,6 +15,7 @@ struct block_header {
 static struct block_header *head = NULL;
 
 void kheap_init() {
+  
   head = (struct block_header *)HEAP_START;
   head->size = HEAP_SIZE - sizeof(struct block_header);
   head->is_free = true;

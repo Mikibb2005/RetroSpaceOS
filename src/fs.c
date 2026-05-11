@@ -301,24 +301,26 @@ static void print_path_recursive(fs_node_t *node) {
 static void get_cwd_recursive(fs_node_t *node, char *buf, int *pos,
                               size_t size) {
   if (node == root) {
-    if (*pos < size - 1)
+    if ((size_t)*pos < size - 1)
       buf[(*pos)++] = '/';
     return;
   }
 
-  if (node->parent) {
+  if (node->parent) 
+  {
     get_cwd_recursive(node->parent, buf, pos, size);
     // Añadir separador si el padre no es root (porque root ya pone /)
     // Ojo: root pone /, así que /home queda bien.
     // Pero /home/games -> root(/) + home + / + games
     if (node->parent != root) {
-      if (*pos < size - 1)
+      if ((size_t)*pos < size - 1)
         buf[(*pos)++] = '/';
     }
   }
 
   int len = kstrlen(node->name);
-  for (int i = 0; i < len && *pos < size - 1; i++) {
+  for (int i = 0; i < len && (size_t)*pos < size - 1; i++) 
+  {
     buf[(*pos)++] = node->name[i];
   }
 }

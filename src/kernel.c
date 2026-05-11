@@ -16,7 +16,8 @@
 // ESTRUCTURAS Y VARIABLES GLOBALES
 // ============================================================================
 
-struct idt_entry {
+struct idt_entry 
+{
   uint16_t base_lo;
   uint16_t sel;
   uint8_t always0;
@@ -24,7 +25,8 @@ struct idt_entry {
   uint16_t base_hi;
 } __attribute__((packed));
 
-struct idt_ptr {
+struct idt_ptr 
+{
   uint16_t limit;
   uint32_t base;
 } __attribute__((packed));
@@ -33,7 +35,7 @@ struct idt_entry idt[256];
 struct idt_ptr idtp;
 
 
-//32 bits de isr (instruction set register)
+//32 isr (instruction set register) --> Estas son reservadas por la CPU de Intel de 32bits
 extern void isr0();
 extern void isr1();
 extern void isr2();
@@ -86,8 +88,8 @@ extern void irq13();
 extern void irq14();
 extern void irq15();
 
-static void idt_set_gate(uint8_t num, uint32_t base, uint16_t sel,
-                         uint8_t flags) {
+static void idt_set_gate(uint8_t num, uint32_t base, uint16_t sel, uint8_t flags) 
+{
   idt[num].base_lo = base & 0xFFFF;
   idt[num].base_hi = (base >> 16) & 0xFFFF;
   idt[num].sel = sel;
@@ -99,7 +101,8 @@ static void idt_set_gate(uint8_t num, uint32_t base, uint16_t sel,
 // PIC
 // ============================================================================
 
-static void pic_remap(void) {
+static void pic_remap(void) 
+{
   outb(0x20, 0x11);
   outb(0xA0, 0x11);
   io_wait();
@@ -119,10 +122,13 @@ static void pic_remap(void) {
   outb(0xA1, 0x0);
 }
 
-static void pic_send_eoi(uint8_t irq) {
+static void pic_send_eoi(uint8_t irq) 
+{
   if (irq >= 8)
+  {
     outb(0xA0, 0x20);
-  outb(0x20, 0x20);
+  }
+    outb(0x20, 0x20);
 }
 
 // ============================================================================
@@ -134,7 +140,8 @@ static uint32_t timer_freq = 100;
 
 static void timer_handler(void) { timer_ticks++; }
 
-static void timer_init(uint32_t freq) {
+static void timer_init(uint32_t freq) 
+{
   timer_freq = freq;
   uint32_t divisor = 1193180 / freq;
   outb(0x43, 0x36);
@@ -152,29 +159,33 @@ static volatile uint32_t irq_counter = 0;
 // IRQ HANDLER
 // ============================================================================
 
-struct regs {
+struct regs 
+{
   unsigned int gs, fs, es, ds;                         // registros de 
   unsigned int edi, esi, ebp, esp, ebx, edx, ecx, eax; // registros de 
   unsigned int int_no, err_code;                       // registros de 
   unsigned int eip, cs, eflags, useresp, ss;           // registros de 
 };
 
-static const char *irq_names[] = {
+static const char *irq_names[] = 
+{
     "TIMER    ", "KEYBOARD ", "CASCADE  ", "COM2     ",
     "COM1     ", "LPT2     ", "FLOPPY   ", "LPT1     ",
     "RTC      ", "FREE     ", "FREE     ", "FREE     ",
-    "MOUSE    ", "FPU      ", "ATA1     ", "ATA2     "};
+    "MOUSE    ", "FPU      ", "ATA1     ", "ATA2     "
+};
 
-static void draw_system_monitor(uint32_t last_irq) {
+static void draw_system_monitor(uint32_t last_irq) 
+{
   // Guardar posición cursor
   size_t old_row = terminal_row;
   size_t old_col = terminal_column;
   uint8_t old_color = terminal_color;
 
   // Dibujar barra fondo azul
-  for (int i = 0; i < VGA_WIDTH; i++) {
-    terminal_putentryat(' ', vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLUE),
-                        i, 0);
+  for (int i = 0; i < VGA_WIDTH; i++) 
+  {
+    terminal_putentryat(' ', vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLUE), i, 0);
   }
 
   // Escribir info
@@ -186,9 +197,12 @@ static void draw_system_monitor(uint32_t last_irq) {
   terminal_write_dec(irq_counter);
 
   terminal_writestring(" | Last IRQ: ");
-  if (last_irq < 16) {
+  if (last_irq < 16) 
+  {
     terminal_writestring(irq_names[last_irq]);
-  } else {
+  } 
+  else 
+  {
     terminal_writestring("UNKNOWN  ");
   }
 
@@ -205,15 +219,18 @@ static void draw_system_monitor(uint32_t last_irq) {
 // Variable para recordar la última interrupción NO-Timer
 static uint32_t last_significant_irq = 0;
 
-void irq_handler(struct regs *r) {
+void irq_handler(struct regs *r) 
+{ 
   irq_counter++;
   uint32_t irq = r->int_no - 32;
 
-  if (irq != 0) {
+  if (irq != 0) 
+  {
     last_significant_irq = irq;
   }
 
-  if (show_interrupts) {
+  if (show_interrupts) 
+  {
     // Actualizar monitor (optimización: el timer solo actualiza cada 10 ticks
     // para no parpadear tanto, o siempre) Para suavidad, actualizamos siempre
     // pero solo la barra superior
@@ -221,14 +238,18 @@ void irq_handler(struct regs *r) {
   }
 
   if (irq == 0)
+  {
     timer_handler();
+  }
   else if (irq == 1)
+  {
     keyboard_handler();
-
+  }
   pic_send_eoi(irq);
 }
 
-void isr_handler(struct regs *r) {
+void isr_handler(struct regs *r) 
+{
   (void)r;
   // Fault handler stub
 }
@@ -237,7 +258,8 @@ void isr_handler(struct regs *r) {
 // INICIALIZACIÓN IDT
 // ============================================================================
 
-static void idt_init(void) {
+static void idt_init(void) 
+{
   idtp.limit = (sizeof(struct idt_entry) * 256) - 1;
   idtp.base = (uint32_t)&idt;
 
@@ -308,7 +330,8 @@ static void idt_init(void) {
 static char cmd_buf[CMD_SIZE];
 static uint32_t cmd_pos = 0;
 
-static void cmd_help(void) {
+static void cmd_help(void) 
+{
   terminal_setcolor(vga_entry_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK));
   terminal_writestring("\n=== RetroSpaceOS v2.1 ===\n\n");
   terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
@@ -323,7 +346,8 @@ static void cmd_help(void) {
   terminal_writestring("  reboot - Reinicia el sistema\n\n");
 }
 
-static void cmd_irq(void) {
+static void cmd_irq(void) 
+{
   show_interrupts = !show_interrupts;
   if (show_interrupts) {
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
@@ -340,17 +364,22 @@ static void cmd_irq(void) {
   terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
 }
 
-static void cmd_time(void) {
+static void cmd_time(void) 
+{
   rtc_time_t t;
   rtc_get_time(&t);
 
   terminal_writestring("Fecha: ");
   if (t.day < 10)
+  {
     terminal_writestring("0");
+  }
   terminal_write_dec(t.day);
   terminal_writestring("/");
   if (t.month < 10)
+  {
     terminal_writestring("0");
+  }
   terminal_write_dec(t.month);
   terminal_writestring("/");
   terminal_write_dec(2000 + t.year);
@@ -358,20 +387,27 @@ static void cmd_time(void) {
 
   terminal_writestring("Hora:  ");
   if (t.hour < 10)
+  {
     terminal_writestring("0");
+  }
   terminal_write_dec(t.hour);
   terminal_writestring(":");
   if (t.minute < 10)
+  {
     terminal_writestring("0");
+  }
   terminal_write_dec(t.minute);
   terminal_writestring(":");
   if (t.second < 10)
+  {
     terminal_writestring("0");
+  }
   terminal_write_dec(t.second);
   terminal_writestring("\n");
 }
 
-static void cmd_about(void) {
+static void cmd_about(void) 
+{
   terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
   terminal_writestring("\n  RetroSpaceOS v2.1\n");
   terminal_writestring("  - Kernel Modular\n");
@@ -382,11 +418,14 @@ static void cmd_about(void) {
   terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
 }
 
-static void cmd_reboot(void) {
+static void cmd_reboot(void) 
+{
   terminal_writestring("Reiniciando...\n");
   outb(0x64, 0xFE);
   for (;;)
+  {
     __asm__ volatile("cli; hlt");
+  }
 }
 
 // ============================================================================
@@ -397,14 +436,20 @@ static char history[HISTORY_SIZE][CMD_SIZE];
 static int history_count = 0;
 static int history_nav_idx = -1;
 
-static void history_add(const char *cmd) {
+static void history_add(const char *cmd) 
+{
   if (cmd[0] == 0)
+  {
     return;
+  }
   // Evitar duplicados consecutivos
-  if (history_count > 0) {
+  if (history_count > 0) 
+  {
     int last_idx = (history_count - 1) % HISTORY_SIZE;
     if (kstrcmp(history[last_idx], cmd) == 0)
+    {
       return;
+    }
   }
   kstrcpy(history[history_count % HISTORY_SIZE], cmd);
   history_count++;
@@ -414,19 +459,23 @@ static void history_add(const char *cmd) {
 // COMANDOS DE ARCHIVOS
 // ============================================================================
 
-static void cmd_cat(const char *arg) {
-  if (!arg) {
+static void cmd_cat(const char *arg) 
+{
+  if (!arg) 
+  {
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK));
     terminal_writestring("Uso: cat <archivo>\n");
     terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
     return;
   }
   fs_node_t *f = fs_open(arg);
-  if (!f) {
+  if (!f) 
+  {
     terminal_writestring("Archivo no encontrado.\n");
     return;
   }
-  if (f->type == FS_DIR) {
+  if (f->type == FS_DIR) 
+  {
     terminal_writestring("Es un directorio.\n");
     return;
   }
@@ -434,8 +483,10 @@ static void cmd_cat(const char *arg) {
   terminal_writestring("\n");
 }
 
-static void cmd_rm(const char *arg) {
-  if (!arg) {
+static void cmd_rm(const char *arg) 
+{
+  if (!arg) 
+  {
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK));
     terminal_writestring("Uso: rm <archivo>\n");
     terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
@@ -445,36 +496,48 @@ static void cmd_rm(const char *arg) {
   terminal_writestring("Eliminado (si existia).\n");
 }
 
-static void cmd_touch(const char *arg) {
-  if (!arg) {
+static void cmd_touch(const char *arg) 
+{
+  if (!arg) 
+  {
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK));
     terminal_writestring("Uso: touch <archivo>\n");
     terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
     return;
   }
-  if (fs_create_file(arg)) {
+  if (fs_create_file(arg)) 
+  {
     terminal_writestring("Archivo creado.\n");
-  } else {
+  } 
+  else 
+  {
     terminal_writestring("Error: No se pudo crear (¿ya existe?)\n");
   }
 }
 
-static void cmd_mkdir(const char *arg) {
-  if (!arg) {
+static void cmd_mkdir(const char *arg) 
+{
+  if (!arg) 
+  {
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK));
     terminal_writestring("Uso: mkdir <nombre>\n");
     terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
     return;
   }
-  if (fs_create_dir(arg)) {
+  if (fs_create_dir(arg)) 
+  {
     terminal_writestring("Directorio creado.\n");
-  } else {
+  } 
+  else 
+  {
     terminal_writestring("Error: No se pudo crear (¿ya existe?)\n");
   }
 }
 
-static void cmd_cd(const char *arg) {
-  if (!arg) {
+static void cmd_cd(const char *arg) 
+{
+  if (!arg) 
+  {
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK));
     terminal_writestring("Uso: cd <ruta>\n");
     terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
@@ -483,22 +546,27 @@ static void cmd_cd(const char *arg) {
   fs_cd(arg);
 }
 
-static void cmd_pwd(void) {
+static void cmd_pwd(void) 
+{
   fs_pwd();
   terminal_writestring("\n");
 }
 
-static void cmd_chess(void) {
+static void cmd_chess(void) 
+{
   chess_start();
   terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
   terminal_clear();
   terminal_writestring("Gracias por jugar a RetroSpace Chess.\n");
 }
 
-static void process_cmd(void) {
+static void process_cmd(void) 
+{
   cmd_buf[cmd_pos] = '\0';
   if (cmd_pos == 0)
+  {
     return;
+  }
 
   // Guardar en historial
   history_add(cmd_buf);
@@ -508,8 +576,10 @@ static void process_cmd(void) {
   char *arg = NULL;
 
   int i = 0;
-  while (cmd_buf[i]) {
-    if (cmd_buf[i] == ' ') {
+  while (cmd_buf[i]) 
+  {
+    if (cmd_buf[i] == ' ') 
+    {
       cmd_buf[i] = '\0';
       arg = &cmd_buf[i + 1];
       break;
@@ -518,36 +588,67 @@ static void process_cmd(void) {
   }
 
   if (kstrcmp(cmd, "help") == 0)
+  {
     cmd_help();
+  }
   else if (kstrcmp(cmd, "clear") == 0)
+  {
     terminal_clear();
+  }
   else if (kstrcmp(cmd, "time") == 0)
+  {
     cmd_time();
+  }
   else if (kstrcmp(cmd, "irq") == 0)
+  {
     cmd_irq();
+  }
   else if (kstrcmp(cmd, "about") == 0)
+  {
     cmd_about();
+  }
   else if (kstrcmp(cmd, "ls") == 0)
+  {
     fs_list();
+  }
   else if (kstrcmp(cmd, "cat") == 0)
+  {
     cmd_cat(arg);
+  }
   else if (kstrcmp(cmd, "rm") == 0)
+  {
     cmd_rm(arg);
+  }
   else if (kstrcmp(cmd, "touch") == 0)
+  {
     cmd_touch(arg);
+  }
   else if (kstrcmp(cmd, "mkdir") == 0)
+  {
     cmd_mkdir(arg);
+  }
   else if (kstrcmp(cmd, "cd") == 0)
+  {
     cmd_cd(arg);
+  }
   else if (kstrcmp(cmd, "pwd") == 0)
+  {
     cmd_pwd();
+  }
   else if (kstrcmp(cmd, "reboot") == 0)
+  {
     cmd_reboot();
+  }
   else if (kstrcmp(cmd, "spce") == 0)
+  {
     cmd_spce(arg);
+  }
   else if (kstrcmp(cmd, "chess") == 0)
+  {
     cmd_chess();
-  else {
+  }
+  else 
+  {
     terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK));
     terminal_writestring("Comando no encontrado: ");
     terminal_writestring(cmd);
@@ -556,7 +657,8 @@ static void process_cmd(void) {
   }
 }
 
-static void shell_prompt(void) {
+static void shell_prompt(void) 
+{
   char cwd[128];
   fs_get_cwd(cwd, 128);
 
@@ -571,46 +673,69 @@ static void shell_prompt(void) {
 }
 
 // Auxiliar para autocompletado
-static void autocomplete(char *buf, uint32_t *pos) {
+
+
+/* --- Autocomplete --- (buffer chars --> palabra en terminal, 
+uint32_t* pos --> un puntero a la ultima posicion de la palabra que estamos escribiendo)
+
+
+
+
+*/
+static void autocomplete(char *buf, uint32_t *pos) 
+{
   // 1. Encontrar inicio de la palabra actual (último espacio)
   int start = *pos;
-  while (start > 0 && buf[start - 1] != ' ') {
+  while (start > 0 && buf[start - 1] != ' ') 
+  {
     start--;
   }
 
   // Si no hay nada que completar
-  if (start == *pos)
+  if ((uint32_t)start == *pos)
+  {
     return;
+  }
 
   char partial[32];
   int len = *pos - start;
   if (len >= 31)
+  {
     return;
+  }
 
   for (int i = 0; i < len; i++)
+  {
     partial[i] = buf[start + i];
+  }
   partial[len] = '\0';
 
   // 2. Buscar coincidencias en directorio actual
   fs_node_t *dir = fs_get_current_dir();
   if (!dir || dir->type != FS_DIR)
+  {
     return;
+  }
 
   fs_node_t *curr = dir->child;
   fs_node_t *match = NULL;
   int matches = 0;
 
-  while (curr) {
+  while (curr) 
+  {
     // Check prefix
     bool is_prefix = true;
-    for (int i = 0; i < len; i++) {
-      if (curr->name[i] != partial[i]) {
+    for (int i = 0; i < len; i++) 
+    {
+      if (curr->name[i] != partial[i]) 
+      {
         is_prefix = false;
         break;
       }
     }
 
-    if (is_prefix) {
+    if (is_prefix) 
+    {
       match = curr;
       matches++;
     }
@@ -618,63 +743,78 @@ static void autocomplete(char *buf, uint32_t *pos) {
   }
 
   // 3. Completar si es único
-  if (matches == 1 && match) {
+  if (matches == 1 && match) 
+  {
     // Escribir el resto del nombre
     const char *rest = match->name + len;
-    while (*rest &&
-           *pos < CMD_SIZE - 2) { // Dejar espacio para posible / o espacio
+    while (*rest && *pos < CMD_SIZE - 2) 
+    { // Dejar espacio para posible / o espacio
       buf[(*pos)++] = *rest;
       terminal_putchar(*rest);
       rest++;
     }
     // Si es directorio, añadir /
-    if (match->type == FS_DIR) {
+    if (match->type == FS_DIR) 
+    {
       buf[(*pos)++] = '/';
       terminal_putchar('/');
-    } else {
+    } 
+    else 
+    {
       buf[(*pos)++] = ' ';
       terminal_putchar(' ');
     }
-  } else if (matches > 1) {
+  } 
+  else if (matches > 1) 
+  {
     // Beep o listar opciones (simplificado: beep visual)
     // terminal_writestring("\a");
   }
 }
 
-static void shell_run(void) {
+static void shell_run(void) 
+{
   terminal_writestring("\n");
   shell_prompt();
 
-  while (1) {
+  while (1) 
+  {
     unsigned char c = kb_getchar();
 
-    if (c == '\n') {
+    if (c == '\n') 
+    {
       terminal_putchar('\n');
       process_cmd();
       cmd_pos = 0;
       shell_prompt();
-    } else if (c == '\t') { // TAB Autocomplete
+    } 
+    else if (c == '\t') 
+    { // TAB Autocomplete
       autocomplete(cmd_buf, &cmd_pos);
-    } else if (c == '\b') {
-      if (cmd_pos > 0) {
+    } 
+    else if (c == '\b') 
+    {
+      if (cmd_pos > 0) 
+      {
         cmd_pos--;
         terminal_putchar('\b');
       }
-    } else if (c == KEY_UP) {
-      if (history_count > 0) {
+    } 
+    else if (c == KEY_UP) 
+    {
+      if (history_count > 0) 
+      {
         // Calcular nuevo índice
         if (history_nav_idx == -1)
+        {
           history_nav_idx = history_count - 1;
-        else if (history_nav_idx > 0 &&
-                 history_nav_idx > history_count - HISTORY_SIZE)
+        }
+        else if (history_nav_idx > 0 && history_nav_idx > history_count - HISTORY_SIZE)
+        {
           history_nav_idx--;
-
-        // Borrar línea actual
-        // Necesitamos saber longitud del prompt para borrar correctamente,
-        // pero terminal_putchar('\b') solo mueve cursor.
-        // Simplificación: Borrar visualmente todo lo escrito
-        // (Asumimos que el usuario no ha hecho wrap de línea)
-        while (cmd_pos > 0) {
+        }
+        while (cmd_pos > 0) 
+        {
           terminal_putchar('\b');
           cmd_pos--;
         }
@@ -685,81 +825,93 @@ static void shell_run(void) {
         cmd_pos = kstrlen(cmd_buf);
         terminal_writestring(cmd_buf);
       }
-    } else if (c == KEY_DOWN) {
-      if (history_count > 0 && history_nav_idx != -1) {
+    } 
+    else if (c == KEY_DOWN) 
+    {
+      if (history_count > 0 && history_nav_idx != -1) 
+      {
         history_nav_idx++;
 
         // Borrar línea
-        while (cmd_pos > 0) {
+        while (cmd_pos > 0) 
+        {
           terminal_putchar('\b');
           cmd_pos--;
         }
 
-        if (history_nav_idx >= history_count) {
+        if (history_nav_idx >= history_count) 
+        {
           history_nav_idx = -1; // Volver a línea vacía
-        } else {
+        } 
+        else 
+        {
           const char *hist_cmd = history[history_nav_idx % HISTORY_SIZE];
           kstrcpy(cmd_buf, hist_cmd);
           cmd_pos = kstrlen(cmd_buf);
           terminal_writestring(cmd_buf);
         }
       }
-    } else if (c >= 32 && c < 127 && cmd_pos < CMD_SIZE - 1) {
+    } 
+    else if (c >= 32 && c < 127 && cmd_pos < CMD_SIZE - 1) 
+    {
       cmd_buf[cmd_pos++] = c;
       terminal_putchar(c);
     }
   }
 }
 
+static void print_banner(void)
+{
+  terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
+  terminal_writestring("\n\n");
+  terminal_writestring("  ____      _             ____                       \n");
+  terminal_writestring(" |  _ \\ ___| |_ _ __ ___ / ___| _ __   __ _  ___ ___ \n");
+  terminal_writestring(" | |_) / _ \\ __| '__/ _ \\\\___ \\| '_ \\ / _` |/ __/ _ \\\n");
+  terminal_writestring(" |  _ <  __/ |_| | | (_) |___) | |_) | (_| | (_|  __/\n");
+  terminal_writestring(" |_| \\_\\___|\\__|_|  \\___/|____/| .__/ \\__,_|\\___\\___|\n");
+  terminal_writestring("                               |_|        OS v1.0   \n");
+  terminal_writestring("\n");
+  terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+  terminal_writestring("==========================================================\n\n");
+}
+
 // ============================================================================
 // KERNEL MAIN
 // ============================================================================
 
-void kernel_main(void) {
-  terminal_initialize();
+void kernel_main(void) 
+{
+  terminal_initialize(); //crea el buffer de la terminal y la printea
 
-  terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
-  terminal_writestring("\n\n");
-  terminal_writestring(
-      "  ____      _             ____                       \n");
-  terminal_writestring(
-      " |  _ \\ ___| |_ _ __ ___ / ___| _ __   __ _  ___ ___ \n");
-  terminal_writestring(
-      " | |_) / _ \\ __| '__/ _ \\\\___ \\| '_ \\ / _` |/ __/ _ \\\n");
-  terminal_writestring(
-      " |  _ <  __/ |_| | | (_) |___) | |_) | (_| | (_|  __/\n");
-  terminal_writestring(
-      " |_| \\_\\___|\\__|_|  \\___/|____/| .__/ \\__,_|\\___\\___|\n");
-  terminal_writestring(
-      "                               |_|        OS v2.0   \n");
-  terminal_writestring("\n");
+  print_banner(); //Printar el banner
 
-  terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
-  terminal_writestring(
-      "==========================================================\n\n");
 
   terminal_writestring("  [");
   terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
   terminal_writestring("OK");
   terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
   terminal_writestring("] Memory Manager (Heap)\n");
-  kheap_init();
+  
+  kheap_init(); //inicializa el heap (4Mb --> se hace un malloc)
 
   terminal_writestring("  [");
   terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
   terminal_writestring("OK");
   terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
   terminal_writestring("] File System (RAMFS)\n");
-  fs_init();
+
+  fs_init(); //Inicializa el files system a modo de arbol (donde cada nodo tiene hijo, padre y 1 hermano)
 
   terminal_writestring("  [");
   terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
   terminal_writestring("OK");
   terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
   terminal_writestring("] Interrupts & Timer\n");
-  idt_init();
-  timer_init(100);
+
+  idt_init(); //inicializar la tabla de interrupciones
+  timer_init(100);//inicializar el timer del sistema, donde se le pasa una frecuencia de 100 (que es la predet.)
   keyboard_init(); // Inicializar teclado explícitamente
+
   terminal_writestring("  [");
   terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
   terminal_writestring("OK");
@@ -767,11 +919,10 @@ void kernel_main(void) {
   terminal_writestring("] Keyboard Initialized\n");
 
   // Force unmask IRQ 0 (Timer) and IRQ 1 (Keyboard) explicitly
-  // 0xFC = 1111 1100 (Bit 0=0 enable Timer, Bit 1=0 enable Keyboard)
-  outb(0x21, 0xFC);
+  outb(0x21, 0xFC); //--> 1111 1100 : 0xFC (Bit 0=0 enable Timer, Bit 1=0 enable Keyboard)
   outb(0xA1, 0xFF);
 
   __asm__ volatile("sti");
 
-  shell_run();
+  shell_run(); //Se printa el ultimo estado de la terminal y espera a que se escriba en esta (tiene control del autocompletar, etc)
 }
